@@ -1,0 +1,199 @@
+{% extends 'shop/basic.html' %}
+
+{% block title %}Quick View - {{ product.product_name }}{% endblock %}
+
+{% block css %}
+<style>
+    .product-img {
+        width: 100%; /* Set width to 100% of the container */
+        max-width: 600px; /* Set maximum width */
+        height: auto; /* Maintain aspect ratio */
+    }
+    .product-img {
+        width: 100%;
+        height: 300px; /* Fixed height */
+        object-fit: cover; /* Ensure the image covers the area */
+    }
+    .related-products img {
+        width: 100%; /* Adjust width as needed */
+        height: 200px; /* Fixed height */
+        object-fit: cover; /* Ensure the image covers the area */
+    }
+    .product-details {
+        padding: 20px;
+    }
+    .related-products {
+        margin-top: 30px;
+    }
+    .related-product-item {
+        margin-bottom: 20px;
+    }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="container my-5">
+    <div class="row">
+        <div class="col-md-6">
+            <img src="/media/{{ product.image }}" alt="{{ product.product_name }}" class="product-img">
+        </div>
+        <div class="col-md-6 product-details">
+            <h2 id="namepr{{ product.id }}">{{ product.product_name }}</h2>
+            <h4 id="pricepr{{ product.id }}">Price: ₹{{ product.price }}</h4>
+            <h4 id="qtypr{{ product.id }}">Qty: {{ product.qty }}</h4>
+            <p>{{ product.desc }}</p>
+            <h5>Category: {{ product.category }}</h5>
+            <span id="divpr{{ product.id }}">
+                <button id="pr{{ product.id }}" class="btn btn-primary cart">Add To Cart</button>
+            </span>
+        </div>
+    </div>
+
+    <!-- Display related products -->
+    <div class="related-products">
+        <h3>Similar Products</h3>
+        <div class="row">
+            {% for related_product in related_products %}
+                <div class="col-md-4 related-product-item">
+                    <div class="card">
+                        <img src="/media/{{ related_product.image }}" class="card-img-top" alt="{{ related_product.product_name }}">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ related_product.product_name }}</h5>
+                            <p class="card-text">Price: ₹{{ related_product.price }}</p>
+                            <p class="card-text">Qty: {{ related_product.qty }}</p>
+                            <a href="{% url 'quick_view' related_product.id %}" class="btn btn-primary">View Details</a>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <p>No similar products found.</p>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block js %}
+<script>
+// Initialize cart from localStorage
+if (localStorage.getItem('cart') == null) {
+    var cart = {};
+} else {
+    cart = JSON.parse(localStorage.getItem('cart'));
+    updateCart(cart);
+}
+
+// Handle Add to Cart button click
+$('.product-details').on('click', 'button.cart', function(){
+    console.log('Add to Cart button clicked');
+    var idstr = this.id; // Unique ID for each product button
+    console.log('Product ID:', idstr);
+
+    var nameElement = document.getElementById('namepr' + idstr.slice(2));
+    var priceElement = document.getElementById('pricepr' + idstr.slice(2));
+    var qtyElement = document.getElementById('qtypr' + idstr.slice(2));
+
+    if (nameElement && priceElement) {
+        var name = nameElement.innerText;
+        var price = parseInt(priceElement.innerText.replace('Price: ₹', ''));
+        console.log('Product Name:', name);
+        console.log('Product Price:', price);
+
+        if (cart[idstr] != undefined) {
+            cart[idstr][0] += 1; // Increase quantity if item already in cart
+            console.log('Updated quantity:', cart[idstr][0]);
+        } else {
+            cart[idstr] = [1, name, price]; // Add new item to cart
+            console.log('Added new item to cart:', cart[idstr]);
+        }
+        updateCart(cart);
+    } else {
+        console.error('Name or Price element not found for ID:', idstr);
+    }
+});
+
+function updateCart(cart) {
+    console.log("Updating cart display with:", cart);
+    var sum = 0;
+    for (var item in cart) {
+        sum += cart[item][0];
+        var element = document.getElementById('div' + item);
+        if (element) {
+            element.innerHTML = "<button id='minus" + item + "' class='btn btn-primary minus'>-</button> <span id='val" + item + "'>" + cart[item][0] + "</span> <button id='plus" + item + "' class='btn btn-primary plus'> + </button>";
+        } else {
+            console.warn('Element with ID div' + item + ' not found.');
+        }
+    }
+    localStorage.setItem('cart', JSON.stringify(cart)); // Save updated cart to localStorage
+    document.getElementById('cart').innerHTML = sum; // Update cart quantity display
+    updatePopover(cart); // Update the popover with the new cart data
+}
+
+// Ensure the popover is initialized
+$(document).ready(function(){
+    $('#popcart').popover();
+});
+
+// Handle Minus button click
+$('.product-details').on("click", "button.minus", function() {
+    var a = this.id.slice(7); // Extract product ID from button ID
+    cart['pr' + a][0] -= 1;
+    cart['pr' + a][0] = Math.max(0, cart['pr' + a][0]); // Ensure quantity doesn't go below 0
+    
+    if (cart['pr' + a][0] == 0){
+        var divElement = document.getElementById('divpr' + a);
+        if (divElement) {
+            divElement.innerHTML = '<button id="pr'+a+'" class="btn btn-primary cart">Add to Cart</button>';
+        }
+        delete cart['pr'+a]; // Remove item from cart if quantity is 0
+    } else {
+        document.getElementById('valpr' + a).innerHTML = cart['pr' + a][0];
+    }
+    updateCart(cart);
+});
+
+// Handle Plus button click
+$('.product-details').on("click", "button.plus", function() {
+    var a = this.id.slice(6); // Extract product ID from button ID
+    cart['pr' + a][0] += 1;
+    document.getElementById('valpr' + a).innerHTML = cart['pr' + a][0];
+    updateCart(cart);
+});
+
+function updatePopover(cart) {
+    console.log('Updating popover with cart items');
+    var popStr = "<h5>Your Cart</h5><div class='mx-2 my-2'>";
+    var i = 1;
+    for (var item in cart) {
+        var nameElement = document.getElementById('name' + item);
+        if (nameElement) {
+            popStr += "<b>" + i + "</b>. " + nameElement.innerHTML.slice(0, 19) + "... Qty: " + cart[item][0] + "<br>";
+            i++;
+        } else {
+            console.warn('Element with ID name' + item + ' not found on this page. Displaying item from cart.');
+            popStr += "<b>" + i + "</b>. " + cart[item][1].slice(0, 19) + "... Qty: " + cart[item][0] + "<br>";
+            i++;
+        }
+    }
+    popStr += "</div><a href='/shop/checkout'><button class='btn btn-primary' id ='checkout'>Checkout</button></a> <button class='btn btn-primary' onclick='clearCart()' id ='clearCart'>Clear Cart</button>";
+    console.log(popStr);
+    document.getElementById('popcart').setAttribute('data-content', popStr);
+    $('#popcart').popover('show');
+}
+
+function clearCart() {
+    cart = JSON.parse(localStorage.getItem('cart'));
+    for (var item in cart) {
+        var divElement = document.getElementById('div' + item);
+        if (divElement) {
+            divElement.innerHTML = '<button id="' + item + '" class="btn btn-primary cart">Add To Cart</button>';
+        } else {
+            console.warn('Element with ID div' + item + ' not found.');
+        }
+    }
+    localStorage.clear();
+    cart = {};
+    updateCart(cart);
+};
+</script>
+{% endblock %}
